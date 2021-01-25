@@ -1,5 +1,7 @@
 #include "VirtualSwitchSaiInterface.h"
 
+#include "../../lib/inc/PerformanceIntervalTimer.h"
+
 #include "swss/logger.h"
 
 #include "meta/sai_serialize.h"
@@ -23,13 +25,14 @@
 
 using namespace saivs;
 using namespace saimeta;
+using namespace sairediscommon;
 
 VirtualSwitchSaiInterface::VirtualSwitchSaiInterface(
         _In_ const std::shared_ptr<SwitchConfigContainer> scc)
 {
     SWSS_LOG_ENTER();
 
-    m_realObjectIdManager = std::make_shared<RealObjectIdManager>(0, scc);
+    m_realObjectIdManager = std::make_shared<RealObjectIdManager>(0, scc); // TODO fix global context
 
     m_switchConfigContainer = scc;
 }
@@ -477,13 +480,38 @@ sai_status_t VirtualSwitchSaiInterface::create(                 \
             attr_list);                                         \
 }
 
+sai_status_t VirtualSwitchSaiInterface::create(
+        _In_ const sai_route_entry_t* entry,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t *attr_list)
+{
+    SWSS_LOG_ENTER();
+
+    static PerformanceIntervalTimer timer("VirtualSwitchSaiInterface::create(route_entry)");
+
+    timer.start();
+
+    auto status = create(
+            entry->switch_id,
+            SAI_OBJECT_TYPE_ROUTE_ENTRY,
+            sai_serialize_route_entry(*entry),
+            attr_count,
+            attr_list);
+
+    timer.stop();
+
+    timer.inc();
+
+    return status;
+}
+
 DECLARE_CREATE_ENTRY(FDB_ENTRY,fdb_entry);
 DECLARE_CREATE_ENTRY(INSEG_ENTRY,inseg_entry);
 DECLARE_CREATE_ENTRY(IPMC_ENTRY,ipmc_entry);
 DECLARE_CREATE_ENTRY(L2MC_ENTRY,l2mc_entry);
 DECLARE_CREATE_ENTRY(MCAST_FDB_ENTRY,mcast_fdb_entry);
 DECLARE_CREATE_ENTRY(NEIGHBOR_ENTRY,neighbor_entry);
-DECLARE_CREATE_ENTRY(ROUTE_ENTRY,route_entry);
+//DECLARE_CREATE_ENTRY(ROUTE_ENTRY,route_entry);
 DECLARE_CREATE_ENTRY(NAT_ENTRY,nat_entry);
 
 #define DECLARE_SET_ENTRY(OT,ot)                                \
@@ -952,7 +980,9 @@ sai_status_t VirtualSwitchSaiInterface::bulkRemove(
 {
     SWSS_LOG_ENTER();
 
-    return SAI_STATUS_NOT_IMPLEMENTED;
+    auto ss = m_switchStateMap.at(switchId);
+
+    return ss->bulkRemove(object_type, serialized_object_ids, mode, object_statuses);
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkRemove(
@@ -1119,7 +1149,9 @@ sai_status_t VirtualSwitchSaiInterface::bulkSet(
 {
     SWSS_LOG_ENTER();
 
-    return SAI_STATUS_NOT_IMPLEMENTED;
+    auto ss = m_switchStateMap.at(switchId);
+
+    return ss->bulkSet(object_type, serialized_object_ids, attr_list, mode, object_statuses);
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkCreate(
@@ -1164,9 +1196,9 @@ sai_status_t VirtualSwitchSaiInterface::bulkCreate(
 {
     SWSS_LOG_ENTER();
 
-    // support mode !
+    auto ss = m_switchStateMap.at(switchId);
 
-    return SAI_STATUS_NOT_IMPLEMENTED;
+    return ss->bulkCreate(switchId, object_type, serialized_object_ids, attr_count, attr_list, mode, object_statuses);;
 }
 
 sai_status_t VirtualSwitchSaiInterface::bulkCreate(

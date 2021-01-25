@@ -14,6 +14,9 @@
 #include "RedisVidIndexGenerator.h"
 #include "RequestShutdown.h"
 #include "ContextConfig.h"
+#include "BreakConfig.h"
+#include "NotificationProducerBase.h"
+#include "SelectableChannel.h"
 
 #include "meta/SaiAttributeList.h"
 
@@ -60,7 +63,7 @@ namespace syncd
         public: // TODO private
 
             void processEvent(
-                    _In_ swss::ConsumerTable &consumer);
+                    _In_ SelectableChannel& consumer);
 
             sai_status_t processQuadEventInInitViewMode(
                     _In_ sai_object_type_t objectType,
@@ -160,6 +163,23 @@ namespace syncd
                     _In_ const std::vector<std::shared_ptr<saimeta::SaiAttributeList>> &attributes,
                     _In_ const std::vector<std::vector<swss::FieldValueTuple>>& strAttributes);
 
+            sai_status_t processBulkCreateEntry(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::vector<std::string>& objectIds,
+                    _In_ const std::vector<std::shared_ptr<saimeta::SaiAttributeList>>& attributes,
+                    _Out_ std::vector<sai_status_t>& statuses);
+
+            sai_status_t processBulkRemoveEntry(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::vector<std::string>& objectIds,
+                    _Out_ std::vector<sai_status_t>& statuses);
+
+            sai_status_t processBulkSetEntry(
+                    _In_ sai_object_type_t objectType,
+                    _In_ const std::vector<std::string>& objectIds,
+                    _In_ const std::vector<std::shared_ptr<saimeta::SaiAttributeList>>& attributes,
+                    _Out_ std::vector<sai_status_t>& statuses);
+
             sai_status_t processBulkQuadEventInInitViewMode(
                     _In_ sai_object_type_t objectType,
                     _In_ const std::vector<std::string> &object_ids,
@@ -196,6 +216,21 @@ namespace syncd
                     _In_ const std::string &strObjectId,
                     _In_ uint32_t attr_count,
                     _In_ sai_attribute_t *attr_list);
+
+        private: // process bulk oid
+
+            sai_status_t processBulkOidCreate(
+                    _In_ sai_object_type_t objectType,
+                    _In_ sai_bulk_op_error_mode_t mode,
+                    _In_ const std::vector<std::string>& objectIds,
+                    _In_ const std::vector<std::shared_ptr<saimeta::SaiAttributeList>>& attributes,
+                    _Out_ std::vector<sai_status_t>& statuses);
+
+            sai_status_t processBulkOidRemove(
+                    _In_ sai_object_type_t objectType,
+                    _In_ sai_bulk_op_error_mode_t mode,
+                    _In_ const std::vector<std::string>& objectIds,
+                    _Out_ std::vector<sai_status_t>& statuses);
 
         private: // process quad in init view mode
 
@@ -355,8 +390,6 @@ namespace syncd
 
             std::shared_ptr<FlexCounterManager> m_manager;
 
-            std::shared_ptr<swss::ProducerTable> m_getResponse;
-
             /**
              * @brief set of objects removed by user when we are in init view
              * mode. Those could be vlan members, bridge ports etc.
@@ -407,6 +440,8 @@ namespace syncd
 
             std::shared_ptr<syncd::NotificationProcessor> m_processor;
 
+            std::shared_ptr<SelectableChannel> m_selectableChannel;
+
         private:
 
             /**
@@ -437,22 +472,20 @@ namespace syncd
 
             std::shared_ptr<swss::DBConnector> m_dbAsic;
 
-            std::shared_ptr<swss::DBConnector> m_dbNtf;
-
-            std::shared_ptr<swss::ConsumerTable> m_asicState;
-
             std::shared_ptr<swss::NotificationConsumer> m_restartQuery;
 
             std::shared_ptr<swss::DBConnector> m_dbFlexCounter;
             std::shared_ptr<swss::ConsumerTable> m_flexCounter;
             std::shared_ptr<swss::ConsumerTable> m_flexCounterGroup;
 
-            std::shared_ptr<swss::NotificationProducer> m_notifications;
+            std::shared_ptr<NotificationProducerBase> m_notifications;
 
             std::shared_ptr<sairedis::SwitchConfigContainer> m_switchConfigContainer;
             std::shared_ptr<sairedis::RedisVidIndexGenerator> m_redisVidIndexGenerator;
             std::shared_ptr<sairedis::VirtualObjectIdManager> m_virtualObjectIdManager;
 
             std::shared_ptr<sairedis::ContextConfig> m_contextConfig;
+
+            std::shared_ptr<BreakConfig> m_breakConfig;
     };
 }
